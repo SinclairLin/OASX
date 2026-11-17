@@ -91,12 +91,11 @@ jobs:
         run: flutter build windows --release
 
       - name: Package and upload Windows zip
-        shell: bash
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          set -euo pipefail
-          cd build/windows/x64/runner/Release
-          tar -a -c -f "$GITHUB_WORKSPACE/oasx_${RELEASE_TAG}_windows.zip" *
-          gh release upload "$RELEASE_TAG" "$GITHUB_WORKSPACE/oasx_${RELEASE_TAG}_windows.zip" --clobber
+          $dest = Join-Path $env:GITHUB_WORKSPACE "oasx_$($env:RELEASE_TAG)_windows.zip"
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath $dest -Force
+          gh release upload $env:RELEASE_TAG $dest --clobber
