@@ -1,0 +1,89 @@
+name: Attach release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to attach packages to
+        required: true
+        default: v0.3.4
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.27.1"
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build universal APK
+        run: flutter build apk --release
+
+      - name: Build split-per-abi APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          dir=build/app/outputs/flutter-apk
+          cp "$dir/app-release.apk" "$dir/oasx_${RELEASE_TAG}_universal.apk"
+          cp "$dir/app-armeabi-v7a-release.apk" "$dir/oasx_${RELEASE_TAG}_armeabi-v7a.apk"
+          cp "$dir/app-arm64-v8a-release.apk" "$dir/oasx_${RELEASE_TAG}_arm64-v8a.apk"
+          cp "$dir/app-x86_64-release.apk" "$dir/oasx_${RELEASE_TAG}_x86_64.apk"
+          gh release upload "$RELEASE_TAG" \
+            "$dir/oasx_${RELEASE_TAG}_universal.apk" \
+            "$dir/oasx_${RELEASE_TAG}_armeabi-v7a.apk" \
+            "$dir/oasx_${RELEASE_TAG}_arm64-v8a.apk" \
+            "$dir/oasx_${RELEASE_TAG}_x86_64.apk" \
+            --clobber
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.27.1"
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Windows app
+        run: flutter build windows --release
+
+      - name: Package and upload Windows zip
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          cd build/windows/x64/runner/Release
+          tar -a -c -f "$GITHUB_WORKSPACE/oasx_${RELEASE_TAG}_windows.zip" *
+          gh release upload "$RELEASE_TAG" "$GITHUB_WORKSPACE/oasx_${RELEASE_TAG}_windows.zip" --clobber
