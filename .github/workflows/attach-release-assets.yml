@@ -7,12 +7,22 @@ on:
         description: Release tag to attach packages to
         required: true
         default: v0.3.4
+      target:
+        description: Which packages to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - android
+          - windows
 
 permissions:
   contents: write
 
 jobs:
   android:
+    if: inputs.target != 'windows'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -59,7 +69,10 @@ jobs:
             --clobber
 
   windows:
-    runs-on: windows-latest
+    if: inputs.target != 'android'
+    # Flutter 3.27 only understands VS 2022 (17). windows-latest now has a newer
+    # Visual Studio, and CMake then looks for the missing VS 2019 generator.
+    runs-on: windows-2022
     timeout-minutes: 60
     steps:
       - name: Check out repository code
